@@ -347,12 +347,23 @@ const handleProgress = (data) => {
     smallestHash.value = data.smallestHash;
   }
   
-  // Calculate progress based on probability
   if (difficulty.value) {
-    const difficultyLevel = parseInt(difficulty.value.replace(/[^0-9]/g, '').length * 4) || 1;
-    const probabilityOfFailurePerAttempt = 1 - (1 / Math.pow(2, difficultyLevel));
-    const probabilityOfSuccess = 1 - Math.pow(probabilityOfFailurePerAttempt, attempts.value);
-    progressPercentage.value = Math.min(probabilityOfSuccess * 100, 95);
+    // Calculate difficulty level from hex target
+    const targetValue = parseInt(difficulty.value, 16);
+    const totalPossibilities = Math.pow(16, difficulty.value.length); // or Math.pow(2, difficulty.value.length * 4)
+    const allowedPossibilities = targetValue + 1; // +1 because we include 0
+    const difficultyLevel = Math.log2(totalPossibilities / allowedPossibilities);
+
+    const successProbPerAttempt = 1 / Math.pow(2, difficultyLevel);
+
+    // Geometric distribution: P(success after n attempts) = 1 - (1-p)^n
+    const rawProgress = 1 - Math.pow(1 - successProbPerAttempt, attempts.value);
+
+    // Apply a curve that makes progress feel more linear to users
+    const curvedProgress = 1 - Math.exp(-3 * rawProgress);
+
+    // Scale to percentage, cap at 99% to show we're still working
+    progressPercentage.value = Math.min(curvedProgress * 100, 99);
   }
   
   emit('progress', data);
